@@ -147,4 +147,3 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 ---
 
 **Disclaimer:** Use this tool responsibly and only on networks for which you have explicit permission to scan. The authors are not liable for any misuse of this software.
-```
