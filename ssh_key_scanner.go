@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/schollz/progressbar/v3"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -16,6 +17,7 @@ func main() {
 	cidrStr := flag.String("cidr", "", "Comma-separated list of CIDRs to scan")
 	rateLimit := flag.Int("rate-limit", 100, "Number of scan attempts per second")
 	concurrency := flag.Int("concurrency", 50, "Maximum number of concurrent scanning goroutines")
+	verbosity := flag.Int("verbosity", 0, "Verbosity level (0-4)")
 	flag.Parse()
 
 	if *cidrStr == "" {
@@ -46,6 +48,12 @@ func main() {
 	rateLimiter := time.Tick(time.Second / time.Duration(*rateLimit))
 	concurrencyLimiter := make(chan struct{}, *concurrency)
 
+	// Initialize progress bar
+	var bar *progressbar.ProgressBar
+	if *verbosity >= 0 {
+		bar = progressbar.Default(int64(len(ipList)))
+	}
+
 	// Concurrently scan each IP address
 	for _, ip := range ipList {
 		<-rateLimiter // Rate limiting
@@ -56,17 +64,28 @@ func main() {
 			defer wg.Done()
 			defer func() { <-concurrencyLimiter }() // Release the slot
 
-			hostKey, err := getHostKey(ip + ":22")
+			hostKey, err := getHostKey(ip+":22", *verbosity)
 			if err != nil {
-				return
+				if *verbosity >= 3 {
+					fmt.Printf("Error connecting to %s: %v\n", ip, err)
+				}
+			} else if hostKey == nil {
+				if *verbosity >= 4 {
+					fmt.Printf("No host key found for %s\n", ip)
+				}
+			} else {
+				fingerprint := ssh.FingerprintSHA256(hostKey)
+				mu.Lock()
+				hostKeyMap[fingerprint] = append(hostKeyMap[fingerprint], ip)
+				mu.Unlock()
+				if *verbosity >= 2 {
+					fmt.Printf("Scanned %s: %s\n", ip, fingerprint)
+				}
 			}
-			if hostKey == nil {
-				return
+
+			if bar != nil {
+				bar.Add(1)
 			}
-			fingerprint := ssh.FingerprintSHA256(hostKey)
-			mu.Lock()
-			hostKeyMap[fingerprint] = append(hostKeyMap[fingerprint], ip)
-			mu.Unlock()
 		}(ip)
 	}
 
@@ -81,7 +100,7 @@ func main() {
 }
 
 // getHostKey connects to an SSH server and retrieves its host key
-func getHostKey(addr string) (ssh.PublicKey, error) {
+func getHostKey(addr string, verbosity int) (ssh.PublicKey, error) {
 	var hostKey ssh.PublicKey
 
 	config := &ssh.ClientConfig{
