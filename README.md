@@ -10,6 +10,7 @@ A Go program to scan specified networks for SSH servers and identify reused SSH 
 - [Usage](#usage)
 - [Examples](#examples)
 - [Options](#options)
+- [Docker Usage](#docker-usage)
 - [Notes](#notes)
 - [License](#license)
 
@@ -24,43 +25,51 @@ A Go program to scan specified networks for SSH servers and identify reused SSH 
 
 ## Prerequisites
 
-- Go 1.11 or later installed on your system.
+- **Go 1.20 or later** installed on your system (if building without Docker).
 - Network access to the IP addresses in the specified CIDR ranges.
 - Necessary permissions to perform network scanning.
+- **Docker** installed on your system (if using Docker).
 
 ## Installation
 
-1. **Save the Code**
+### **Cloning the Repository**
 
-   Save the `ssh_key_scanner.go` file in a directory of your choice.
+Clone the repository to your local machine:
 
-2. **Initialize a Go Module**
+```bash
+git clone https://github.com/yourusername/ssh_key_scanner.git
+cd ssh_key_scanner
+```
 
-   Open a terminal in the project directory and run:
+### **Building from Source**
+
+1. **Initialize the Go Module**
+
+   Ensure all dependencies are fetched:
 
    ```bash
-   go mod init ssh_key_scanner
+   go mod tidy
    ```
 
-3. **Download Dependencies**
-
-   Retrieve the necessary Go packages:
-
-   ```bash
-   go get golang.org/x/crypto/ssh
-   go get github.com/schollz/progressbar/v3
-   go get github.com/spf13/pflag
-   ```
-
-4. **Build the Program**
+2. **Build the Program**
 
    Compile the Go program:
 
    ```bash
-   go build -o ssh_key_scanner ssh_key_scanner.go
+   go build -o ssh_key_scanner
    ```
 
+### **Building with Docker**
+
+Build the Docker image using the provided `Dockerfile`:
+
+```bash
+docker build -t ssh_key_scanner .
+```
+
 ## Usage
+
+### **Running the Binary**
 
 Run the compiled binary with the desired options and CIDR notations as positional arguments:
 
@@ -68,10 +77,12 @@ Run the compiled binary with the desired options and CIDR notations as positiona
 ./ssh_key_scanner [options] CIDR1 [CIDR2 ...]
 ```
 
-**Or**, run the program directly without building:
+### **Running with Docker**
+
+Run the Docker container with the necessary options:
 
 ```bash
-go run ssh_key_scanner.go [options] CIDR1 [CIDR2 ...]
+docker run --rm ssh_key_scanner [options] CIDR1 [CIDR2 ...]
 ```
 
 ## Examples
@@ -100,6 +111,12 @@ go run ssh_key_scanner.go [options] CIDR1 [CIDR2 ...]
    - `-c 100`: Set concurrency to 100 goroutines.
    - `-o json`: Output results in JSON format.
 
+4. **Running with Docker and Saving Output:**
+
+   ```bash
+   docker run --rm ssh_key_scanner -o json 192.168.1.0/24 > results.json
+   ```
+
 ## Options
 
 - `--rate-limit, -r int`  
@@ -123,6 +140,44 @@ go run ssh_key_scanner.go [options] CIDR1 [CIDR2 ...]
 - `--output-format, -o string`  
   Output format: `table` (default), `json`, `csv`.
 
+## Docker Usage
+
+### **Building the Docker Image**
+
+Build the Docker image using the provided `Dockerfile`:
+
+```bash
+docker build -t ssh_key_scanner .
+```
+
+### **Running the Docker Container**
+
+1. **Basic Usage**
+
+   ```bash
+   docker run --rm ssh_key_scanner [options] CIDR1 [CIDR2 ...]
+   ```
+
+2. **Example with Options**
+
+   ```bash
+   docker run --rm ssh_key_scanner -p -o json 192.168.1.0/24
+   ```
+
+3. **Using Host Network (Linux Only)**
+
+   ```bash
+   docker run --rm --network host ssh_key_scanner 192.168.1.0/24
+   ```
+
+   **Note:** `--network host` allows the container to access the host's network interfaces, which may be necessary to scan local networks.
+
+4. **Saving Output to a File**
+
+   ```bash
+   docker run --rm ssh_key_scanner -o json 192.168.1.0/24 > results.json
+   ```
+
 ## Notes
 
 - **Network Permissions:**
@@ -135,6 +190,10 @@ go run ssh_key_scanner.go [options] CIDR1 [CIDR2 ...]
 - **Performance:**
   - Adjust the `--rate-limit` and `--concurrency` options based on your network environment and system capabilities.
   - High concurrency levels can consume significant system resources.
+
+- **Docker on macOS and Windows:**
+  - The `--network host` option is not supported on Docker for macOS and Windows due to limitations in the Docker network stack.
+  - You may need to run the scanner directly on your host system to scan local networks on these platforms.
 
 - **Understanding the Output:**
   - The program reports SSH host key fingerprints (SHA256) that are used by multiple hosts.
