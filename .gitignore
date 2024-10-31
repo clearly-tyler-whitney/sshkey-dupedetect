@@ -25,3 +25,6 @@ go.work.sum
 .env
 ssh_key_scanner2
 ssh_key_scanner3
+ssh_key_scanner4
+ssh_key_scanner5
+ssh_key_scanner6

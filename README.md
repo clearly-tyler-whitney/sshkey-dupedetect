@@ -1,6 +1,6 @@
 # SSH Key Scanner
 
-A Go program to scan specified networks for SSH servers and identify reused SSH host keys across different hosts. It accepts a `--cidr` flag with comma-separated CIDR notations to specify the networks to scan.
+A Go program to scan specified networks for SSH servers and identify reused SSH host keys across different hosts. It accepts CIDR notations as positional arguments to specify the networks to scan.
 
 ## Table of Contents
 
@@ -8,7 +8,8 @@ A Go program to scan specified networks for SSH servers and identify reused SSH 
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
 - [Usage](#usage)
-- [Example](#example)
+- [Examples](#examples)
+- [Options](#options)
 - [Notes](#notes)
 - [License](#license)
 
@@ -17,7 +18,9 @@ A Go program to scan specified networks for SSH servers and identify reused SSH 
 - Scans multiple CIDR ranges concurrently for SSH servers.
 - Retrieves SSH host keys without needing authentication.
 - Identifies and reports duplicate SSH host keys used across different IPs.
-- Utilizes concurrency to speed up the scanning process.
+- Supports rate limiting and concurrency control.
+- Provides optional progress bar and verbosity levels.
+- Outputs results in table, JSON, or CSV formats.
 
 ## Prerequisites
 
@@ -27,7 +30,7 @@ A Go program to scan specified networks for SSH servers and identify reused SSH 
 
 ## Installation
 
-1. **Clone the Repository or Save the Code**
+1. **Save the Code**
 
    Save the `ssh_key_scanner.go` file in a directory of your choice.
 
@@ -45,6 +48,8 @@ A Go program to scan specified networks for SSH servers and identify reused SSH 
 
    ```bash
    go get golang.org/x/crypto/ssh
+   go get github.com/schollz/progressbar/v3
+   go get github.com/spf13/pflag
    ```
 
 4. **Build the Program**
@@ -57,32 +62,66 @@ A Go program to scan specified networks for SSH servers and identify reused SSH 
 
 ## Usage
 
-Run the compiled binary with the `--cidr` flag, providing a comma-separated list of CIDR notations:
+Run the compiled binary with the desired options and CIDR notations as positional arguments:
 
 ```bash
-./ssh_key_scanner --cidr="CIDR1,CIDR2,..."
+./ssh_key_scanner [options] CIDR1 [CIDR2 ...]
 ```
 
 **Or**, run the program directly without building:
 
 ```bash
-go run ssh_key_scanner.go --cidr="CIDR1,CIDR2,..."
+go run ssh_key_scanner.go [options] CIDR1 [CIDR2 ...]
 ```
 
-## Example
+## Examples
 
-Scanning the networks `192.168.1.0/24` and `10.0.0.0/8`:
+1. **Scanning a Single CIDR Range:**
 
-```bash
-./ssh_key_scanner --cidr="192.168.1.0/24,10.0.0.0/8"
-```
+   ```bash
+   ./ssh_key_scanner 192.168.1.0/24
+   ```
 
-**Sample Output:**
+2. **Scanning Multiple CIDR Ranges:**
 
-```
-Duplicate host key SHA256:abcd1234... used by hosts: [192.168.1.10 192.168.1.20]
-Duplicate host key SHA256:efgh5678... used by hosts: [10.0.0.5 10.0.0.25]
-```
+   ```bash
+   ./ssh_key_scanner 192.168.1.0/24 10.0.0.0/8
+   ```
+
+3. **Using Short Options and Enabling Progress Bar:**
+
+   ```bash
+   ./ssh_key_scanner -p -v 2 -r 200 -c 100 -o json 192.168.1.0/24 10.0.0.0/8
+   ```
+
+   - `-p`: Enable progress bar.
+   - `-v 2`: Set verbosity level to 2.
+   - `-r 200`: Set rate limit to 200 scans per second.
+   - `-c 100`: Set concurrency to 100 goroutines.
+   - `-o json`: Output results in JSON format.
+
+## Options
+
+- `--rate-limit, -r int`  
+  Number of scan attempts per second (default 100).
+
+- `--concurrency, -c int`  
+  Maximum number of concurrent scanning goroutines (default 50).
+
+- `--verbosity, -v int`  
+  Verbosity level (0-4) (default 0).
+
+  - **Level 0:** Minimal output (only duplicates).
+  - **Level 1:** Basic progress updates.
+  - **Level 2:** Scanned IPs and their fingerprints.
+  - **Level 3:** Includes errors encountered during connections.
+  - **Level 4:** Detailed information, including when no host key is found.
+
+- `--progress, -p`  
+  Show progress bar (off by default).
+
+- `--output-format, -o string`  
+  Output format: `table` (default), `json`, `csv`.
 
 ## Notes
 
@@ -94,8 +133,8 @@ Duplicate host key SHA256:efgh5678... used by hosts: [10.0.0.5 10.0.0.25]
   - Be aware that scanning might trigger alerts or be blocked by firewalls.
 
 - **Performance:**
-  - The program uses concurrency (`goroutines`) to scan multiple IPs simultaneously.
-  - Adjust system limits if scanning very large networks to prevent resource exhaustion.
+  - Adjust the `--rate-limit` and `--concurrency` options based on your network environment and system capabilities.
+  - High concurrency levels can consume significant system resources.
 
 - **Understanding the Output:**
   - The program reports SSH host key fingerprints (SHA256) that are used by multiple hosts.
@@ -108,3 +147,4 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 ---
 
 **Disclaimer:** Use this tool responsibly and only on networks for which you have explicit permission to scan. The authors are not liable for any misuse of this software.
+```
