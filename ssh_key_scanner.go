@@ -12,8 +12,10 @@ import (
 )
 
 func main() {
-	// Define the --cidr flag
+	// Define the flags
 	cidrStr := flag.String("cidr", "", "Comma-separated list of CIDRs to scan")
+	rateLimit := flag.Int("rate-limit", 100, "Number of scan attempts per second")
+	concurrency := flag.Int("concurrency", 50, "Maximum number of concurrent scanning goroutines")
 	flag.Parse()
 
 	if *cidrStr == "" {
@@ -40,11 +42,20 @@ func main() {
 	var mu sync.Mutex
 	hostKeyMap := make(map[string][]string) // Map of host key fingerprints to IPs
 
+	// Create rate limiter and concurrency limiter
+	rateLimiter := time.Tick(time.Second / time.Duration(*rateLimit))
+	concurrencyLimiter := make(chan struct{}, *concurrency)
+
 	// Concurrently scan each IP address
 	for _, ip := range ipList {
+		<-rateLimiter // Rate limiting
+
 		wg.Add(1)
+		concurrencyLimiter <- struct{}{} // Acquire a slot
 		go func(ip string) {
 			defer wg.Done()
+			defer func() { <-concurrencyLimiter }() // Release the slot
+
 			hostKey, err := getHostKey(ip + ":22")
 			if err != nil {
 				return
@@ -85,8 +96,8 @@ func getHostKey(addr string) (ssh.PublicKey, error) {
 
 	conn, err := ssh.Dial("tcp", addr, config)
 	if err != nil {
-		if strings.Contains(err.Error(), "unable to authenticate") {
-			return hostKey, nil // Authentication failed but host key is retrieved
+		if strings.Contains(err.Error(), "unable to authenticate") || strings.Contains(err.Error(), "no common algorithm") {
+			return hostKey, nil // Host key is retrieved even if authentication fails
 		}
 		return nil, err
 	}
